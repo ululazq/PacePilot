@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">PacePilot</string>
+    <string name="channel_ride_name">Ride Tracking &amp; Pacing</string>
+    <string name="channel_ride_desc">Shows live cycling stats, speed targets, and COT tracking</string>
+    <string name="channel_alerts_name">Cycling Reminders</string>
+    <string name="channel_alerts_desc">Alerts for fueling, rest stops, and speed adjustments</string>
+</resources>
