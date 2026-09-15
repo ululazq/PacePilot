@@ -12,7 +12,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,11 +29,19 @@ import androidx.core.content.ContextCompat
 import com.pacepilot.app.data.model.BikePoint
 import com.pacepilot.app.data.model.RideMetrics
 import com.pacepilot.app.data.model.RouteProfile
+import com.pacepilot.app.data.model.SavedRoute
 import com.pacepilot.app.data.model.UserSettings
+import com.pacepilot.app.data.repository.ActivityRepository
+import com.pacepilot.app.data.repository.RouteRepository
 import com.pacepilot.app.service.RideTrackingService
+import com.pacepilot.app.ui.components.AppTab
+import com.pacepilot.app.ui.components.BottomNavBar
 import com.pacepilot.app.ui.screens.ActiveRideScreen
+import com.pacepilot.app.ui.screens.ActivityHistoryScreen
+import com.pacepilot.app.ui.screens.HealthMetricsScreen
 import com.pacepilot.app.ui.screens.RideSummaryDialog
 import com.pacepilot.app.ui.screens.RouteSetupScreen
+import com.pacepilot.app.ui.screens.SavedRoutesScreen
 import com.pacepilot.app.ui.screens.SettingsBottomSheet
 import com.pacepilot.app.ui.theme.DarkBackground
 import com.pacepilot.app.ui.theme.PacePilotTheme
@@ -101,22 +112,22 @@ class MainActivity : ComponentActivity(), LocationListener {
                             }
                         )
                     } else {
-                        androidx.compose.material3.Scaffold(
+                        Scaffold(
                             bottomBar = {
-                                com.pacepilot.app.ui.components.BottomNavBar(
+                                BottomNavBar(
                                     currentTab = currentTab,
                                     onTabSelected = { currentTab = it }
                                 )
                             },
                             containerColor = DarkBackground
                         ) { innerPadding ->
-                            androidx.compose.foundation.layout.Box(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .androidx.compose.foundation.layout.padding(innerPadding)
+                                    .padding(innerPadding)
                             ) {
                                 when (currentTab) {
-                                    com.pacepilot.app.ui.components.AppTab.NAVIGATE -> {
+                                    AppTab.NAVIGATE -> {
                                         RouteSetupScreen(
                                             currentLocation = currentLoc,
                                             initialRoute = selectedRouteForRide,
@@ -141,7 +152,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                                                 showSettings = true
                                             },
                                             onSaveRoute = { route ->
-                                                val saved = com.pacepilot.app.data.model.SavedRoute(
+                                                val saved = SavedRoute(
                                                     title = route.destinationName,
                                                     totalDistanceMeters = route.totalDistanceMeters,
                                                     estimatedDurationSeconds = route.estimatedDurationSeconds,
@@ -152,22 +163,22 @@ class MainActivity : ComponentActivity(), LocationListener {
                                             }
                                         )
                                     }
-                                    com.pacepilot.app.ui.components.AppTab.ROUTES -> {
-                                        com.pacepilot.app.ui.screens.SavedRoutesScreen(
+                                    AppTab.ROUTES -> {
+                                        SavedRoutesScreen(
                                             repository = routeRepository,
                                             onSelectRouteForRide = { route ->
                                                 selectedRouteForRide = route
-                                                currentTab = com.pacepilot.app.ui.components.AppTab.NAVIGATE
+                                                currentTab = AppTab.NAVIGATE
                                             }
                                         )
                                     }
-                                    com.pacepilot.app.ui.components.AppTab.ACTIVITY -> {
-                                        com.pacepilot.app.ui.screens.ActivityHistoryScreen(
+                                    AppTab.ACTIVITY -> {
+                                        ActivityHistoryScreen(
                                             repository = activityRepository
                                         )
                                     }
-                                    com.pacepilot.app.ui.components.AppTab.HEALTH -> {
-                                        com.pacepilot.app.ui.screens.HealthMetricsScreen(
+                                    AppTab.HEALTH -> {
+                                        HealthMetricsScreen(
                                             repository = activityRepository
                                         )
                                     }

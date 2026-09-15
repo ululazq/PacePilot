@@ -20,9 +20,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.TurnLeft
-import androidx.compose.material.icons.filled.TurnRight
-import androidx.compose.material.icons.filled.UturnLeft
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,11 +53,9 @@ fun TurnBanner(
 
     val icon: ImageVector = when (step.maneuver) {
         ManeuverType.DEPART -> Icons.Default.Navigation
-        ManeuverType.TURN_LEFT, ManeuverType.SHARP_LEFT -> Icons.Default.TurnLeft
-        ManeuverType.TURN_RIGHT, ManeuverType.SHARP_RIGHT -> Icons.Default.TurnRight
-        ManeuverType.SLIGHT_LEFT -> Icons.Default.ArrowBack
-        ManeuverType.SLIGHT_RIGHT -> Icons.Default.ArrowForward
-        ManeuverType.U_TURN -> Icons.Default.UturnLeft
+        ManeuverType.TURN_LEFT, ManeuverType.SHARP_LEFT, ManeuverType.SLIGHT_LEFT -> Icons.Default.ArrowBack
+        ManeuverType.TURN_RIGHT, ManeuverType.SHARP_RIGHT, ManeuverType.SLIGHT_RIGHT -> Icons.Default.ArrowForward
+        ManeuverType.U_TURN -> Icons.Default.Undo
         ManeuverType.ROUNDABOUT -> Icons.Default.Refresh
         ManeuverType.ARRIVE -> Icons.Default.CheckCircle
         else -> Icons.Default.ArrowUpward
