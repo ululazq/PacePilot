@@ -97,7 +97,7 @@ fun SettingsBottomSheet(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "🍌 Notifikasi Fueling / Nutrisi",
+                        text = "Notifikasi Fueling / Nutrisi",
                         fontWeight = FontWeight.SemiBold,
                         color = WarningAmber
                     )
@@ -134,7 +134,7 @@ fun SettingsBottomSheet(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "☕ Notifikasi Istirahat (Rest Stop)",
+                        text = "Notifikasi Istirahat (Rest Stop)",
                         fontWeight = FontWeight.SemiBold,
                         color = BrightCyan
                     )

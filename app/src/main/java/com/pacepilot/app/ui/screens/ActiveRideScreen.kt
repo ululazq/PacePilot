@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -200,7 +202,12 @@ fun ActiveRideScreen(
                         .padding(12.dp)
                 ) {
                     Column {
-                        Text("🍌 FUELING", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = WarningAmber)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Restaurant, contentDescription = null, tint = WarningAmber, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("FUELING", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = WarningAmber)
+                        }
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = String.format(Locale.US, "%02d:%02d", fuelMins, fuelSecs),
                             fontSize = 18.sp,
@@ -221,7 +228,12 @@ fun ActiveRideScreen(
                         .padding(12.dp)
                 ) {
                     Column {
-                        Text("☕ ISTIRAHAT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = BrightCyan)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Coffee, contentDescription = null, tint = BrightCyan, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("ISTIRAHAT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = BrightCyan)
+                        }
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = String.format(Locale.US, "%02d:%02d", restMins, restSecs),
                             fontSize = 18.sp,

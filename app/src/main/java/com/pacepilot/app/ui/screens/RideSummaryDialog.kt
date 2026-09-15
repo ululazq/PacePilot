@@ -42,7 +42,7 @@ fun RideSummaryDialog(
 ) {
     val isCotAchieved = metrics.elapsedTimeMillis <= metrics.targetCotMillis
     val statusColor = if (isCotAchieved) NeonGreen else AlertRed
-    val statusTitle = if (isCotAchieved) "🏆 TARGET COT TERCAPAI!" else "⏱️ MELEBIHI TARGET COT"
+    val statusTitle = if (isCotAchieved) "TARGET COT TERCAPAI!" else "MELEBIHI TARGET COT"
 
     val elapsedHours = metrics.elapsedTimeMillis / 3600000
     val elapsedMinutes = (metrics.elapsedTimeMillis % 3600000) / 60000
