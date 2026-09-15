@@ -66,6 +66,12 @@ class MainActivity : ComponentActivity(), LocationListener {
                     val activeRoute by RideTrackingService.activeRoute.collectAsState()
                     val currentLoc by currentLocationState
 
+                    val routeRepository = remember { com.pacepilot.app.data.repository.RouteRepository(this@MainActivity) }
+                    val activityRepository = remember { com.pacepilot.app.data.repository.ActivityRepository(this@MainActivity) }
+
+                    var currentTab by remember { mutableStateOf(com.pacepilot.app.ui.components.AppTab.NAVIGATE) }
+                    var selectedRouteForRide by remember { mutableStateOf<RouteProfile?>(null) }
+
                     var showSettings by remember { mutableStateOf(false) }
                     var showSummary by remember { mutableStateOf(false) }
                     var isRideActive by remember { mutableStateOf(false) }
@@ -95,29 +101,79 @@ class MainActivity : ComponentActivity(), LocationListener {
                             }
                         )
                     } else {
-                        RouteSetupScreen(
-                            currentLocation = currentLoc,
-                            onStartRide = { route, cotMillis, isSimulation ->
-                                RideTrackingService.setRoute(route)
-                                val action = if (isSimulation) {
-                                    RideTrackingService.ACTION_SIMULATE
-                                } else {
-                                    RideTrackingService.ACTION_START
-                                }
-                                val intent = Intent(this@MainActivity, RideTrackingService::class.java).apply {
-                                    this.action = action
-                                    putExtra(RideTrackingService.EXTRA_TOTAL_DISTANCE, route.totalDistanceMeters)
-                                    putExtra(RideTrackingService.EXTRA_COT_MILLIS, cotMillis)
-                                    putExtra(RideTrackingService.EXTRA_FUELING_MINS, RideTrackingService.currentSettings.fuelingIntervalMinutes)
-                                    putExtra(RideTrackingService.EXTRA_REST_MINS, RideTrackingService.currentSettings.restIntervalMinutes)
-                                }
-                                ContextCompat.startForegroundService(this@MainActivity, intent)
-                                isRideActive = true
+                        androidx.compose.material3.Scaffold(
+                            bottomBar = {
+                                com.pacepilot.app.ui.components.BottomNavBar(
+                                    currentTab = currentTab,
+                                    onTabSelected = { currentTab = it }
+                                )
                             },
-                            onOpenSettings = {
-                                showSettings = true
+                            containerColor = DarkBackground
+                        ) { innerPadding ->
+                            androidx.compose.foundation.layout.Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .androidx.compose.foundation.layout.padding(innerPadding)
+                            ) {
+                                when (currentTab) {
+                                    com.pacepilot.app.ui.components.AppTab.NAVIGATE -> {
+                                        RouteSetupScreen(
+                                            currentLocation = currentLoc,
+                                            initialRoute = selectedRouteForRide,
+                                            onStartRide = { route, cotMillis, isSimulation ->
+                                                RideTrackingService.setRoute(route)
+                                                val action = if (isSimulation) {
+                                                    RideTrackingService.ACTION_SIMULATE
+                                                } else {
+                                                    RideTrackingService.ACTION_START
+                                                }
+                                                val intent = Intent(this@MainActivity, RideTrackingService::class.java).apply {
+                                                    this.action = action
+                                                    putExtra(RideTrackingService.EXTRA_TOTAL_DISTANCE, route.totalDistanceMeters)
+                                                    putExtra(RideTrackingService.EXTRA_COT_MILLIS, cotMillis)
+                                                    putExtra(RideTrackingService.EXTRA_FUELING_MINS, RideTrackingService.currentSettings.fuelingIntervalMinutes)
+                                                    putExtra(RideTrackingService.EXTRA_REST_MINS, RideTrackingService.currentSettings.restIntervalMinutes)
+                                                }
+                                                ContextCompat.startForegroundService(this@MainActivity, intent)
+                                                isRideActive = true
+                                            },
+                                            onOpenSettings = {
+                                                showSettings = true
+                                            },
+                                            onSaveRoute = { route ->
+                                                val saved = com.pacepilot.app.data.model.SavedRoute(
+                                                    title = route.destinationName,
+                                                    totalDistanceMeters = route.totalDistanceMeters,
+                                                    estimatedDurationSeconds = route.estimatedDurationSeconds,
+                                                    waypoints = route.waypoints,
+                                                    steps = route.steps
+                                                )
+                                                routeRepository.saveRoute(saved)
+                                            }
+                                        )
+                                    }
+                                    com.pacepilot.app.ui.components.AppTab.ROUTES -> {
+                                        com.pacepilot.app.ui.screens.SavedRoutesScreen(
+                                            repository = routeRepository,
+                                            onSelectRouteForRide = { route ->
+                                                selectedRouteForRide = route
+                                                currentTab = com.pacepilot.app.ui.components.AppTab.NAVIGATE
+                                            }
+                                        )
+                                    }
+                                    com.pacepilot.app.ui.components.AppTab.ACTIVITY -> {
+                                        com.pacepilot.app.ui.screens.ActivityHistoryScreen(
+                                            repository = activityRepository
+                                        )
+                                    }
+                                    com.pacepilot.app.ui.components.AppTab.HEALTH -> {
+                                        com.pacepilot.app.ui.screens.HealthMetricsScreen(
+                                            repository = activityRepository
+                                        )
+                                    }
+                                }
                             }
-                        )
+                        }
                     }
 
                     if (showSettings) {

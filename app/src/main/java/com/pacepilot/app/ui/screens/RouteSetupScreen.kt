@@ -63,6 +63,7 @@ import com.pacepilot.app.ui.theme.DarkCardBorder
 import com.pacepilot.app.ui.theme.NeonGreen
 import com.pacepilot.app.ui.theme.TextPrimary
 import com.pacepilot.app.ui.theme.TextSecondary
+import androidx.compose.material.icons.filled.BookmarkAdd
 import com.pacepilot.app.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -71,7 +72,9 @@ import java.util.Locale
 fun RouteSetupScreen(
     currentLocation: BikePoint?,
     onStartRide: (route: RouteProfile, cotMillis: Long, isSimulation: Boolean) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onSaveRoute: ((RouteProfile) -> Unit)? = null,
+    initialRoute: RouteProfile? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -84,7 +87,7 @@ fun RouteSetupScreen(
     var destinationName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
 
-    var calculatedRoute by remember { mutableStateOf<RouteProfile?>(null) }
+    var calculatedRoute by remember(initialRoute) { mutableStateOf(initialRoute) }
     var isCalculatingRoute by remember { mutableStateOf(false) }
 
     // Target COT (in hours, e.g. 2.0 = 2 hours)
@@ -229,13 +232,32 @@ fun RouteSetupScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = "Rute Sepeda Ditemukan",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NeonGreen
-                        )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Rute Sepeda Ditemukan",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NeonGreen
+                            )
+                            if (onSaveRoute != null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                IconButton(
+                                    onClick = {
+                                        onSaveRoute(route)
+                                        Toast.makeText(context, "Rute berhasil disimpan ke Rute Saya!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.BookmarkAdd,
+                                        contentDescription = "Simpan Rute",
+                                        tint = BrightCyan,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
                         Text(
                             text = String.format(Locale.US, "%.1f km (Est. %d menit)", route.totalDistanceKm, route.estimatedDurationMinutes),
                             fontSize = 18.sp,

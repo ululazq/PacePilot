@@ -20,11 +20,16 @@ import androidx.core.app.NotificationCompat
 import com.pacepilot.app.MainActivity
 import com.pacepilot.app.PacePilotApp
 import com.pacepilot.app.R
+import com.pacepilot.app.data.api.RoutingService
 import com.pacepilot.app.data.model.BikePoint
 import com.pacepilot.app.data.model.PacingStatus
 import com.pacepilot.app.data.model.RideMetrics
+import com.pacepilot.app.data.model.RideRecord
 import com.pacepilot.app.data.model.RouteProfile
+import com.pacepilot.app.data.model.RouteStep
 import com.pacepilot.app.data.model.UserSettings
+import com.pacepilot.app.data.repository.ActivityRepository
+import com.pacepilot.app.fitness.HealthCalculator
 import com.pacepilot.app.pacing.PacingEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +50,12 @@ class RideTrackingService : Service(), LocationListener {
 
     private lateinit var locationManager: LocationManager
     private lateinit var notificationManager: NotificationManager
+    private lateinit var activityRepository: ActivityRepository
+    private var voiceManager: VoiceNavigationManager? = null
     private var vibrator: Vibrator? = null
+
+    private var currentStepIndex = 0
+    private var lastAnnouncedStepIndex = -1
 
     private var isTracking = false
     private var isPaused = false
@@ -103,6 +113,8 @@ class RideTrackingService : Service(), LocationListener {
         super.onCreate()
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        activityRepository = ActivityRepository(this)
+        voiceManager = VoiceNavigationManager(this)
 
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
@@ -153,6 +165,15 @@ class RideTrackingService : Service(), LocationListener {
         smoothingSpeedBuffer.clear()
         lastLocation = null
 
+        currentStepIndex = 0
+        lastAnnouncedStepIndex = -1
+        val initialSteps = _activeRoute.value?.steps ?: emptyList()
+        val firstStep = initialSteps.firstOrNull()
+
+        if (currentSettings.enableVoiceNavigation) {
+            voiceManager?.speak("Mulai navigasi rute sepeda", isUrgent = true)
+        }
+
         val initialResult = PacingEngine.evaluatePacing(
             totalDistanceMeters = totalDistance,
             distanceCoveredMeters = 0.0,
@@ -177,7 +198,11 @@ class RideTrackingService : Service(), LocationListener {
             nextFuelingSeconds = currentSettings.fuelingIntervalMinutes * 60L,
             nextRestSeconds = currentSettings.restIntervalMinutes * 60L,
             isPaused = false,
-            isFinished = false
+            isFinished = false,
+            currentStep = firstStep,
+            distanceToNextStepMeters = firstStep?.distanceMeters ?: 0.0,
+            caloriesKcal = 0,
+            sweatLossLiters = 0.0
         )
 
         startForeground(NOTIFICATION_ID_FOREGROUND, buildForegroundNotification())
@@ -203,7 +228,7 @@ class RideTrackingService : Service(), LocationListener {
                     )
                 }
             } catch (e: SecurityException) {
-                // Permission not granted handled in UI
+                // Handled in UI
             }
         }
 
@@ -237,6 +262,36 @@ class RideTrackingService : Service(), LocationListener {
             currentSpeedKmh = currentSpeedKmh,
             speedToleranceKmh = currentSettings.speedAlertThresholdKmh
         )
+
+        // Hitung kalori dan kehilangan cairan (Health Metrics)
+        val calories = HealthCalculator.calculateCalories(elapsed, currentSpeedKmh)
+        val sweatLoss = HealthCalculator.calculateSweatLossLiters(elapsed, currentSpeedKmh)
+
+        // Hitung langkah navigasi turn-by-turn terkini
+        val steps = _activeRoute.value?.steps ?: emptyList()
+        val curPos = _metrics.value.currentPosition
+        var activeStep: RouteStep? = null
+        var distToStep = 0.0
+
+        if (steps.isNotEmpty() && currentStepIndex < steps.size) {
+            activeStep = steps[currentStepIndex]
+            if (curPos != null) {
+                distToStep = RoutingService.calculateHaversineDistance(curPos, activeStep.location)
+                if (distToStep < 25.0 && currentStepIndex < steps.size - 1) {
+                    currentStepIndex++
+                    activeStep = steps[currentStepIndex]
+                    distToStep = RoutingService.calculateHaversineDistance(curPos, activeStep.location)
+                }
+            } else {
+                distToStep = activeStep.distanceMeters
+            }
+
+            // Suara navigasi turn-by-turn saat mendekati titik belokan
+            if (currentSettings.enableVoiceNavigation && currentStepIndex != lastAnnouncedStepIndex && distToStep in 15.0..120.0) {
+                voiceManager?.speak(activeStep.instruction)
+                lastAnnouncedStepIndex = currentStepIndex
+            }
+        }
 
         // Hitung mundur fueling dan rest
         val fuelingIntervalMs = currentSettings.fuelingIntervalMinutes * 60 * 1000L
@@ -277,7 +332,11 @@ class RideTrackingService : Service(), LocationListener {
             pacingStatus = pacing.status,
             pacingAdvice = pacing.advice,
             nextFuelingSeconds = fuelingRemainingSec,
-            nextRestSeconds = restRemainingSec
+            nextRestSeconds = restRemainingSec,
+            currentStep = activeStep,
+            distanceToNextStepMeters = distToStep,
+            caloriesKcal = calories,
+            sweatLossLiters = sweatLoss
         )
 
         // Update foreground notification tiap 2 detik
@@ -308,6 +367,29 @@ class RideTrackingService : Service(), LocationListener {
         tickerJob?.cancel()
         simulationJob?.cancel()
         locationManager.removeUpdates(this)
+
+        val finalMetrics = _metrics.value
+        if (finalMetrics.distanceCoveredMeters > 30.0) {
+            val destinationTitle = _activeRoute.value?.destinationName ?: "Gowes PacePilot"
+            val record = RideRecord(
+                title = destinationTitle,
+                dateMillis = System.currentTimeMillis(),
+                totalDistanceMeters = finalMetrics.distanceCoveredMeters,
+                durationMillis = finalMetrics.elapsedTimeMillis,
+                avgSpeedKmh = finalMetrics.averageSpeedKmh,
+                maxSpeedKmh = maxSpeedKmh,
+                targetCotMillis = finalMetrics.targetCotMillis,
+                isCotAchieved = finalMetrics.elapsedTimeMillis <= finalMetrics.targetCotMillis,
+                caloriesKcal = finalMetrics.caloriesKcal,
+                sweatLossLiters = finalMetrics.sweatLossLiters,
+                recoveryHours = HealthCalculator.calculateRecoveryHours(finalMetrics.elapsedTimeMillis, finalMetrics.averageSpeedKmh)
+            )
+            activityRepository.saveActivity(record)
+        }
+
+        if (currentSettings.enableVoiceNavigation) {
+            voiceManager?.speak("Gowes selesai. Kerja bagus!", isUrgent = true)
+        }
 
         _metrics.value = _metrics.value.copy(isFinished = true)
         stopForeground(STOP_FOREGROUND_REMOVE)

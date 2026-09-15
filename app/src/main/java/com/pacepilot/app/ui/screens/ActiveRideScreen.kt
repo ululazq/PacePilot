@@ -78,34 +78,44 @@ fun ActiveRideScreen(
                 enableLocationOverlay = true
             )
 
-            // Overlaid Mini COT Status at top of map
-            Box(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .align(Alignment.TopCenter)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(DarkBackground.copy(alpha = 0.85f))
-                    .border(1.dp, DarkCardBorder, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                val remSeconds = maxOf(0L, metrics.remainingTimeMillis / 1000L)
-                val cotHrs = remSeconds / 3600
-                val cotMins = (remSeconds % 3600) / 60
-                val cotSecs = remSeconds % 60
+            // 1. Google Maps style Turn Banner or Mini COT status
+            if (metrics.currentStep != null) {
+                com.pacepilot.app.ui.components.TurnBanner(
+                    step = metrics.currentStep,
+                    distanceToManeuverMeters = metrics.distanceToNextStepMeters,
+                    modifier = Modifier
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .align(Alignment.TopCenter)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .align(Alignment.TopCenter)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(DarkBackground.copy(alpha = 0.85f))
+                        .border(1.dp, DarkCardBorder, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    val remSeconds = maxOf(0L, metrics.remainingTimeMillis / 1000L)
+                    val cotHrs = remSeconds / 3600
+                    val cotMins = (remSeconds % 3600) / 60
+                    val cotSecs = remSeconds % 60
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "SISA COT: ",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary
-                    )
-                    Text(
-                        text = String.format(Locale.US, "%02d:%02d:%02d", cotHrs, cotMins, cotSecs),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
-                        color = if (metrics.remainingTimeMillis > 0) WarningAmber else AlertRed
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "SISA COT: ",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = String.format(Locale.US, "%02d:%02d:%02d", cotHrs, cotMins, cotSecs),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                            color = if (metrics.remainingTimeMillis > 0) WarningAmber else AlertRed
+                        )
+                    }
                 }
             }
         }

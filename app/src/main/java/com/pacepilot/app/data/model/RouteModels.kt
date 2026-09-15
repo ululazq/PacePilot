@@ -25,7 +25,8 @@ data class RouteProfile(
     val totalDistanceMeters: Double,
     val estimatedDurationSeconds: Double,
     val startName: String = "Titik Awal",
-    val destinationName: String = "Tujuan"
+    val destinationName: String = "Tujuan",
+    val steps: List<RouteStep> = emptyList()
 ) {
     val totalDistanceKm: Double
         get() = totalDistanceMeters / 1000.0
@@ -64,7 +65,11 @@ data class RideMetrics(
     val nextRestSeconds: Long = 0L,
     val isPaused: Boolean = false,
     val isFinished: Boolean = false,
-    val currentPosition: BikePoint? = null
+    val currentPosition: BikePoint? = null,
+    val currentStep: RouteStep? = null,
+    val distanceToNextStepMeters: Double = 0.0,
+    val caloriesKcal: Int = 0,
+    val sweatLossLiters: Double = 0.0
 ) {
     val distanceCoveredKm: Double
         get() = distanceCoveredMeters / 1000.0
@@ -87,14 +92,15 @@ data class RideMetrics(
 }
 
 /**
- * Pengaturan kustom pengguna untuk jeda peringatan
+ * Pengaturan kustom pengguna untuk jeda peringatan dan navigasi suara
  */
 data class UserSettings(
     val fuelingIntervalMinutes: Int = 30, // Default notif makan/minum tiap 30 menit
     val restIntervalMinutes: Int = 60,    // Default notif istirahat tiap 60 menit
     val speedAlertThresholdKmh: Double = 2.5, // Toleransi deviasi kecepatan (km/jam)
     val enableAudioAlerts: Boolean = true,
-    val enableVibrationAlerts: Boolean = true
+    val enableVibrationAlerts: Boolean = true,
+    val enableVoiceNavigation: Boolean = true
 )
 
 /**

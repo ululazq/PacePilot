@@ -1,7 +1,9 @@
 package com.pacepilot.app.data.api
 
 import com.pacepilot.app.data.model.BikePoint
+import com.pacepilot.app.data.model.ManeuverType
 import com.pacepilot.app.data.model.RouteProfile
+import com.pacepilot.app.data.model.RouteStep
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -105,17 +107,66 @@ class RoutingService {
                 waypoints.add(BikePoint(lat, lon))
             }
 
+            // Ekstrak langkah navigasi turn-by-turn dari OSRM legs
+            val stepsList = mutableListOf<RouteStep>()
+            val legs = routeObj.optJSONArray("legs")
+            if (legs != null && legs.length() > 0) {
+                val leg = legs.getJSONObject(0)
+                val steps = leg.optJSONArray("steps")
+                if (steps != null) {
+                    for (s in 0 until steps.length()) {
+                        val stepObj = steps.getJSONObject(s)
+                        val streetName = stepObj.optString("name", "")
+                        val stepDist = stepObj.optDouble("distance", 0.0)
+                        val stepDur = stepObj.optDouble("duration", 0.0)
+
+                        val manObj = stepObj.optJSONObject("maneuver")
+                        val manTypeStr = manObj?.optString("type", "") ?: ""
+                        val manModStr = manObj?.optString("modifier", null)
+                        val manType = ManeuverType.fromOsrm(manTypeStr, manModStr)
+
+                        val locArray = manObj?.optJSONArray("location")
+                        val stepPt = if (locArray != null && locArray.length() >= 2) {
+                            BikePoint(locArray.getDouble(1), locArray.getDouble(0))
+                        } else {
+                            waypoints.firstOrNull() ?: start
+                        }
+
+                        val instruction = buildInstruction(manType, streetName)
+                        stepsList.add(RouteStep(instruction, streetName, manType, stepDist, stepDur, stepPt))
+                    }
+                }
+            }
+
             Result.success(
                 RouteProfile(
                     waypoints = waypoints,
                     totalDistanceMeters = distanceMeters,
                     estimatedDurationSeconds = durationSeconds,
                     startName = startName,
-                    destinationName = destName
+                    destinationName = destName,
+                    steps = stepsList
                 )
             )
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    private fun buildInstruction(maneuver: ManeuverType, street: String): String {
+        val streetSuffix = if (street.isNotBlank()) " ke $street" else ""
+        return when (maneuver) {
+            ManeuverType.DEPART -> "Mulai perjalanan$streetSuffix"
+            ManeuverType.TURN_LEFT -> "Belok kiri$streetSuffix"
+            ManeuverType.TURN_RIGHT -> "Belok kanan$streetSuffix"
+            ManeuverType.SLIGHT_LEFT -> "Ambil serong kiri$streetSuffix"
+            ManeuverType.SLIGHT_RIGHT -> "Ambil serong kanan$streetSuffix"
+            ManeuverType.SHARP_LEFT -> "Belok tajam ke kiri$streetSuffix"
+            ManeuverType.SHARP_RIGHT -> "Belok tajam ke kanan$streetSuffix"
+            ManeuverType.U_TURN -> "Lakukan putar balik$streetSuffix"
+            ManeuverType.STRAIGHT -> "Terus lurus$streetSuffix"
+            ManeuverType.ROUNDABOUT -> "Masuk bundaran$streetSuffix"
+            ManeuverType.ARRIVE -> "Anda telah tiba di tujuan"
         }
     }
 
