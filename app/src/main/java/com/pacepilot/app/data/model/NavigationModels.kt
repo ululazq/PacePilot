@@ -99,6 +99,7 @@ data class SavedRoute(
     val estimatedDurationSeconds: Double,
     val waypoints: List<BikePoint>,
     val steps: List<RouteStep> = emptyList(),
+    val isRoundTrip: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     val totalDistanceKm: Double
@@ -126,6 +127,7 @@ data class SavedRoute(
             put("estimatedDurationSeconds", estimatedDurationSeconds)
             put("waypoints", wpArray)
             put("steps", stepsArray)
+            put("isRoundTrip", isRoundTrip)
             put("createdAt", createdAt)
         }
     }
@@ -152,6 +154,7 @@ data class SavedRoute(
                 estimatedDurationSeconds = json.optDouble("estimatedDurationSeconds", 0.0),
                 waypoints = wpList,
                 steps = stepsList,
+                isRoundTrip = json.optBoolean("isRoundTrip", false),
                 createdAt = json.optLong("createdAt", System.currentTimeMillis())
             )
         }

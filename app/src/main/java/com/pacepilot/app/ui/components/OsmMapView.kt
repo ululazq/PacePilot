@@ -30,7 +30,8 @@ fun OsmMapView(
     currentLocation: BikePoint? = null,
     onMapTap: ((BikePoint) -> Unit)? = null,
     enableLocationOverlay: Boolean = true,
-    initialCenter: BikePoint = BikePoint(-6.2088, 106.8456) // Default Jakarta or user GPS
+    initialCenter: BikePoint = BikePoint(-6.2088, 106.8456),
+    pendingWaypoints: List<BikePoint> = emptyList()
 ) {
     val context = LocalContext.current
     val mapView = remember {
@@ -56,7 +57,7 @@ fun OsmMapView(
         update = { map ->
             map.overlays.clear()
 
-            // 1. Event listener for tapping map to select destination
+            // 1. Event listener for tapping map to select destination or add waypoints
             if (onMapTap != null) {
                 val eventsReceiver = object : MapEventsReceiver {
                     override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
@@ -73,34 +74,52 @@ fun OsmMapView(
                 map.overlays.add(MapEventsOverlay(eventsReceiver))
             }
 
-            // 2. Draw route polyline if available
-            route?.let { r ->
-                if (r.waypoints.isNotEmpty()) {
-                    val polyline = Polyline(map).apply {
-                        val geoPoints = r.waypoints.map { it.toGeoPoint() }
-                        setPoints(geoPoints)
-                        outlinePaint.color = AndroidColor.parseColor("#00E5FF") // Bright Cyan
-                        outlinePaint.strokeWidth = 14f
-                        outlinePaint.strokeCap = Paint.Cap.ROUND
-                        outlinePaint.strokeJoin = Paint.Join.ROUND
-                    }
-                    map.overlays.add(polyline)
+            // 2. Draw route polyline and all waypoint markers if available
+            if (route != null && route.waypoints.isNotEmpty()) {
+                val polyline = Polyline(map).apply {
+                    val geoPoints = route.waypoints.map { it.toGeoPoint() }
+                    setPoints(geoPoints)
+                    outlinePaint.color = AndroidColor.parseColor("#00E5FF") // Bright Cyan
+                    outlinePaint.strokeWidth = 14f
+                    outlinePaint.strokeCap = Paint.Cap.ROUND
+                    outlinePaint.strokeJoin = Paint.Join.ROUND
+                }
+                map.overlays.add(polyline)
 
-                    // Start marker
-                    val startMarker = Marker(map).apply {
-                        position = r.waypoints.first().toGeoPoint()
-                        title = "Mulai: ${r.startName}"
+                // Start marker
+                val startMarker = Marker(map).apply {
+                    position = route.waypoints.first().toGeoPoint()
+                    title = "Mulai: ${route.startName}"
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                }
+                map.overlays.add(startMarker)
+
+                // Intermediate waypoints markers
+                route.userWaypoints.forEachIndexed { index, wp ->
+                    val wpMarker = Marker(map).apply {
+                        position = wp.toGeoPoint()
+                        title = "Titik Jalur #${index + 1}"
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                     }
-                    map.overlays.add(startMarker)
+                    map.overlays.add(wpMarker)
+                }
 
-                    // Destination marker
-                    val destMarker = Marker(map).apply {
-                        position = r.waypoints.last().toGeoPoint()
-                        title = "Tujuan: ${r.destinationName}"
+                // Destination marker
+                val destMarker = Marker(map).apply {
+                    position = route.waypoints.last().toGeoPoint()
+                    title = if (route.isRoundTrip) "Finish (Roundtrip Loop)" else "Tujuan: ${route.destinationName}"
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                }
+                map.overlays.add(destMarker)
+            } else if (pendingWaypoints.isNotEmpty()) {
+                // Tampilkan marker titik sementara sebelum rute selesai dihitung
+                pendingWaypoints.forEachIndexed { idx, pt ->
+                    val marker = Marker(map).apply {
+                        position = pt.toGeoPoint()
+                        title = if (idx == 0) "Mulai" else "Titik Jalur #$idx"
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                     }
-                    map.overlays.add(destMarker)
+                    map.overlays.add(marker)
                 }
             }
 

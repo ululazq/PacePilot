@@ -24,41 +24,80 @@ class RoutingService {
         .build()
 
     /**
-     * Mengambil rute khusus sepeda dari OSRM OpenStreetMap routing endpoint
+     * Mengambil rute khusus sepeda dari OSRM OpenStreetMap routing endpoint (2 titik sederhana)
      */
     suspend fun getBicycleRoute(
         start: BikePoint,
         destination: BikePoint,
         startName: String = "Titik Awal",
         destName: String = "Tujuan"
+    ): Result<RouteProfile> {
+        return getMultiPointRoute(listOf(start, destination), startName, destName, false)
+    }
+
+    /**
+     * Mengambil rute khusus sepeda dengan multiple titik jalur (waypoints) dan opsi roundtrip (pulang-pergi)
+     */
+    suspend fun getMultiPointRoute(
+        points: List<BikePoint>,
+        startName: String = "Titik Awal",
+        destName: String = "Tujuan",
+        isRoundTrip: Boolean = false
     ): Result<RouteProfile> = withContext(Dispatchers.IO) {
+        if (points.size < 2) {
+            return@withContext Result.failure(IllegalArgumentException("Minimal 2 titik diperlukan untuk membentuk rute"))
+        }
+
+        val finalPoints = if (isRoundTrip && points.first() != points.last()) {
+            points + points.first()
+        } else {
+            points
+        }
+
+        val coordsString = finalPoints.joinToString(";") { "${it.longitude},${it.latitude}" }
+
         val primaryUrl = "https://routing.openstreetmap.de/routed-bike/route/v1/driving/" +
-                "${start.longitude},${start.latitude};${destination.longitude},${destination.latitude}" +
+                coordsString +
                 "?overview=full&geometries=geojson&steps=true"
 
         val fallbackUrl = "https://router.project-osrm.org/route/v1/driving/" +
-                "${start.longitude},${start.latitude};${destination.longitude},${destination.latitude}" +
-                "?overview=full&geometries=geojson"
+                coordsString +
+                "?overview=full&geometries=geojson&steps=true"
 
         // Coba endpoint khusus sepeda terlebih dahulu
-        var result = fetchRouteFromUrl(primaryUrl, start, destination, startName, destName)
+        var result = fetchMultiRouteFromUrl(primaryUrl, finalPoints, startName, destName, isRoundTrip)
         if (result.isFailure) {
             // Jika gagal/timeout, coba fallback endpoint
-            result = fetchRouteFromUrl(fallbackUrl, start, destination, startName, destName)
+            result = fetchMultiRouteFromUrl(fallbackUrl, finalPoints, startName, destName, isRoundTrip)
         }
 
         if (result.isFailure) {
-            // Fallback offline / direct path jika tidak ada koneksi internet sama sekali
-            val distance = calculateHaversineDistance(start, destination)
-            val fallbackWaypoints = generateInterpolatedPath(start, destination, 20)
-            val estDurationSeconds = (distance / 4.16) // ~15 km/h sepeda santai
+            // Fallback offline multi-segment direct path jika tidak ada koneksi internet sama sekali
+            var totalDistance = 0.0
+            val fallbackWaypoints = mutableListOf<BikePoint>()
+            for (i in 0 until finalPoints.size - 1) {
+                val p1 = finalPoints[i]
+                val p2 = finalPoints[i + 1]
+                totalDistance += calculateHaversineDistance(p1, p2)
+                val segment = generateInterpolatedPath(p1, p2, 15)
+                if (fallbackWaypoints.isNotEmpty() && segment.isNotEmpty()) {
+                    fallbackWaypoints.addAll(segment.drop(1))
+                } else {
+                    fallbackWaypoints.addAll(segment)
+                }
+            }
+            val estDurationSeconds = totalDistance / 4.16 // ~15 km/h sepeda santai
+            val userWaypoints = if (finalPoints.size > 2) finalPoints.subList(1, finalPoints.size - 1) else emptyList()
+
             Result.success(
                 RouteProfile(
                     waypoints = fallbackWaypoints,
-                    totalDistanceMeters = distance,
+                    totalDistanceMeters = totalDistance,
                     estimatedDurationSeconds = estDurationSeconds,
                     startName = startName,
-                    destinationName = destName
+                    destinationName = if (isRoundTrip) "$destName (Roundtrip)" else destName,
+                    userWaypoints = userWaypoints,
+                    isRoundTrip = isRoundTrip
                 )
             )
         } else {
@@ -66,12 +105,12 @@ class RoutingService {
         }
     }
 
-    private fun fetchRouteFromUrl(
+    private fun fetchMultiRouteFromUrl(
         url: String,
-        start: BikePoint,
-        destination: BikePoint,
+        points: List<BikePoint>,
         startName: String,
-        destName: String
+        destName: String,
+        isRoundTrip: Boolean
     ): Result<RouteProfile> {
         return try {
             val request = Request.Builder()
@@ -107,36 +146,40 @@ class RoutingService {
                 waypoints.add(BikePoint(lat, lon))
             }
 
-            // Ekstrak langkah navigasi turn-by-turn dari OSRM legs
+            // Ekstrak langkah navigasi turn-by-turn dari seluruh OSRM legs
             val stepsList = mutableListOf<RouteStep>()
             val legs = routeObj.optJSONArray("legs")
-            if (legs != null && legs.length() > 0) {
-                val leg = legs.getJSONObject(0)
-                val steps = leg.optJSONArray("steps")
-                if (steps != null) {
-                    for (s in 0 until steps.length()) {
-                        val stepObj = steps.getJSONObject(s)
-                        val streetName = stepObj.optString("name", "")
-                        val stepDist = stepObj.optDouble("distance", 0.0)
-                        val stepDur = stepObj.optDouble("duration", 0.0)
+            if (legs != null) {
+                for (l in 0 until legs.length()) {
+                    val leg = legs.getJSONObject(l)
+                    val steps = leg.optJSONArray("steps")
+                    if (steps != null) {
+                        for (s in 0 until steps.length()) {
+                            val stepObj = steps.getJSONObject(s)
+                            val streetName = stepObj.optString("name", "")
+                            val stepDist = stepObj.optDouble("distance", 0.0)
+                            val stepDur = stepObj.optDouble("duration", 0.0)
 
-                        val manObj = stepObj.optJSONObject("maneuver")
-                        val manTypeStr = manObj?.optString("type", "") ?: ""
-                        val manModStr = manObj?.optString("modifier", null)
-                        val manType = ManeuverType.fromOsrm(manTypeStr, manModStr)
+                            val manObj = stepObj.optJSONObject("maneuver")
+                            val manTypeStr = manObj?.optString("type", "") ?: ""
+                            val manModStr = manObj?.optString("modifier", null)
+                            val manType = ManeuverType.fromOsrm(manTypeStr, manModStr)
 
-                        val locArray = manObj?.optJSONArray("location")
-                        val stepPt = if (locArray != null && locArray.length() >= 2) {
-                            BikePoint(locArray.getDouble(1), locArray.getDouble(0))
-                        } else {
-                            waypoints.firstOrNull() ?: start
+                            val locArray = manObj?.optJSONArray("location")
+                            val stepPt = if (locArray != null && locArray.length() >= 2) {
+                                BikePoint(locArray.getDouble(1), locArray.getDouble(0))
+                            } else {
+                                waypoints.firstOrNull() ?: points.first()
+                            }
+
+                            val instruction = buildInstruction(manType, streetName)
+                            stepsList.add(RouteStep(instruction, streetName, manType, stepDist, stepDur, stepPt))
                         }
-
-                        val instruction = buildInstruction(manType, streetName)
-                        stepsList.add(RouteStep(instruction, streetName, manType, stepDist, stepDur, stepPt))
                     }
                 }
             }
+
+            val userWaypoints = if (points.size > 2) points.subList(1, points.size - 1) else emptyList()
 
             Result.success(
                 RouteProfile(
@@ -144,8 +187,10 @@ class RoutingService {
                     totalDistanceMeters = distanceMeters,
                     estimatedDurationSeconds = durationSeconds,
                     startName = startName,
-                    destinationName = destName,
-                    steps = stepsList
+                    destinationName = if (isRoundTrip) "$destName (Roundtrip)" else destName,
+                    steps = stepsList,
+                    userWaypoints = userWaypoints,
+                    isRoundTrip = isRoundTrip
                 )
             )
         } catch (e: Exception) {

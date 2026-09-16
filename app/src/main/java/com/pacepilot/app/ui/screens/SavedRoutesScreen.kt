@@ -162,7 +162,8 @@ fun SavedRoutesScreen(
                                 estimatedDurationSeconds = route.estimatedDurationSeconds,
                                 startName = "Rute Tersimpan",
                                 destinationName = route.title,
-                                steps = route.steps
+                                steps = route.steps,
+                                isRoundTrip = route.isRoundTrip
                             )
                             onSelectRouteForRide(profile)
                         },
@@ -205,12 +206,30 @@ private fun SavedRouteCard(
                 verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = route.title,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = route.title,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        if (route.isRoundTrip) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(BrightCyan.copy(alpha = 0.15f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "Roundtrip",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BrightCyan
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = "Dibuat: $dateStr",
                         fontSize = 11.sp,

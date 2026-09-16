@@ -157,7 +157,8 @@ class MainActivity : ComponentActivity(), LocationListener {
                                                     totalDistanceMeters = route.totalDistanceMeters,
                                                     estimatedDurationSeconds = route.estimatedDurationSeconds,
                                                     waypoints = route.waypoints,
-                                                    steps = route.steps
+                                                    steps = route.steps,
+                                                    isRoundTrip = route.isRoundTrip
                                                 )
                                                 routeRepository.saveRoute(saved)
                                             }

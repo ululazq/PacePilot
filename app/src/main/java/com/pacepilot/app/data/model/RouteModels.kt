@@ -26,7 +26,9 @@ data class RouteProfile(
     val estimatedDurationSeconds: Double,
     val startName: String = "Titik Awal",
     val destinationName: String = "Tujuan",
-    val steps: List<RouteStep> = emptyList()
+    val steps: List<RouteStep> = emptyList(),
+    val userWaypoints: List<BikePoint> = emptyList(),
+    val isRoundTrip: Boolean = false
 ) {
     val totalDistanceKm: Double
         get() = totalDistanceMeters / 1000.0
